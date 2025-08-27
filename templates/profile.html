@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}My Profile - Learning Quest{% endblock %}
+
+{% block content %}
+<div class="w-full max-w-6xl mx-auto px-6 py-10 animate-fade-in">
+
+  <div class="relative mb-16">
+    <div class="absolute inset-0 h-48 rounded-2xl bg-gradient-to-r from-green-500/30 via-emerald-500/20 to-blue-500/30 blur-2xl"></div>
+    <div class="relative flex flex-col sm:flex-row items-center sm:items-end gap-6 p-6">
+      <img src="https://via.placeholder.com/160"
+           alt="User Avatar"
+           class="w-40 h-40 rounded-full border-4 border-green-400 shadow-lg shadow-green-500/40">
+      <div class="text-center sm:text-left">
+        <h1 class="text-4xl font-bold text-white">Kaif Mutthal</h1>
+        <p class="text-lg text-gray-300">AI Developer 窶｢ Problem Solver</p>
+        <button class="mt-4 px-5 py-2 text-sm font-medium bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-md hover:scale-105 transition">
+          Edit Profile
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+    <div class="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:shadow-xl hover:scale-[1.02] transition">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-green-500/20 text-green-400 text-xl">答</div>
+        <div>
+          <h3 class="text-gray-300 text-sm">Topics Explored</h3>
+          <p class="text-3xl font-extrabold text-white">42</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:shadow-xl hover:scale-[1.02] transition">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 text-xl">堂</div>
+        <div>
+          <h3 class="text-gray-300 text-sm">Articles Saved</h3>
+          <p class="text-3xl font-extrabold text-white">{{ saved_articles|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/10 hover:shadow-xl hover:scale-[1.02] transition">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 flex items-center justify-center rounded-xl bg-purple-500/20 text-purple-400 text-xl">磁</div>
+        <div>
+          <h3 class="text-gray-300 text-sm">Videos Watched</h3>
+          <p class="text-3xl font-extrabold text-white">{{ saved_videos|length }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white/10 backdrop-blur-lg p-6 rounded-2xl border border-white/10 mb-16 shadow-lg">
+    <h3 class="font-semibold text-lg text-white mb-6">投 Learning Activity</h3>
+    <div class="relative h-64">
+      <canvas id="learningChart"></canvas>
+    </div>
+  </div>
+
+  <div>
+    <nav class="flex gap-4 mb-8" id="profile-tabs">
+      <button data-tab="articles" class="tab-btn px-5 py-2 rounded-full font-medium transition">Saved Articles</button>
+      <button data-tab="videos" class="tab-btn px-5 py-2 rounded-full font-medium transition">Saved Videos</button>
+    </nav>
+
+    <div class="py-4">
+      <div id="tab-content-articles" class="tab-content space-y-4">
+        {% if saved_articles %}
+          {% for article in saved_articles %}
+          <a href="{{ article.link or url_for('show_article', article_id=article.id) }}"
+             class="flex gap-4 items-center bg-white/5 p-5 rounded-xl border border-white/10 hover:bg-white/10 transition">
+            <img src="https://via.placeholder.com/80" class="rounded-lg shadow" alt="Article">
+            <div>
+              <h4 class="text-white font-semibold">{{ article.title }}</h4>
+              <p class="text-gray-400 text-sm">{{ article.snippet }}</p>
+            </div>
+          </a>
+          {% endfor %}
+        {% else %}
+          <p class="text-gray-400">No saved articles yet.</p>
+        {% endif %}
+      </div>
+
+      <div id="tab-content-videos" class="tab-content hidden space-y-4">
+        {% if saved_videos %}
+          {% for video in saved_videos %}
+          <a href="{{ video.url or url_for('show_video', video_id=video.id) }}"
+             class="flex gap-4 items-center bg-white/5 p-5 rounded-xl border border-white/10 hover:bg-white/10 transition">
+            <img src="{{ video.thumbnail or 'https://via.placeholder.com/80' }}" class="rounded-lg shadow" alt="Video">
+            <div>
+              <h4 class="text-white font-semibold">{{ video.title }}</h4>
+            </div>
+          </a>
+          {% endfor %}
+        {% else %}
+          <p class="text-gray-400">No saved videos yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='profile.js') }}"></script>
+{% endblock %}

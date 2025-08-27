@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Learning Quest - Home{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center px-4">
+  <div class="text-center mb-16 animate-fade-in">
+    <h1 class="text-7xl font-extrabold text-white tracking-tight drop-shadow-lg leading-tight">
+      Learn with Quizard
+    </h1>
+    <p class="text-gray-300 mt-6 text-xl max-w-2xl mx-auto">
+      Your AI-powered guide to mastering any topic — explore, learn, and grow.
+    </p>
+  </div>
+
+  <div class="w-full max-w-4xl flex items-center gap-2 sticky top-28 py-2 z-20">
+    <div id="search-bar-trigger" class="w-full">
+      <button class="w-full text-left group">
+        <div class="flex items-center bg-white/10 border border-white/20 rounded-2xl shadow-lg p-4 transform transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-2xl backdrop-blur-md">
+          <span class="w-full text-gray-300 group-hover:text-white px-4 py-2 transition text-lg">
+            What do you want to learn today?
+          </span>
+          <div class="bg-green-500 text-white font-bold rounded-full px-8 py-3 ml-2 shadow-md group-hover:bg-green-600 transition-colors">
+            Search
+          </div>
+        </div>
+      </button>
+    </div>
+    <div id="language-menu-container" class="relative inline-block text-left z-10"></div>
+  </div>
+
+  <div class="w-full max-w-screen-xl mx-auto mt-16 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    <div id="content-area" class="lg:col-span-8 animate-fade-up"></div>
+    <aside id="sidebar-container" class="lg:col-span-4 animate-fade-up"></aside>
+  </div>
+
+  <div id="search-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-30 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="flex min-h-full items-start justify-center p-4 text-center pt-20">
+      <div id="search-overlay-panel" class="w-full max-w-2xl transform transition-all duration-300 scale-95 opacity-0">
+        <form id="search-form" class="w-full relative">
+          <div class="flex items-center w-full">
+            <input id="search-input" type="text" placeholder="What are you curious about?" class="w-full text-2xl bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder-gray-400 focus:outline-none focus:border-green-500 transition-all duration-300 py-3 px-6" autocomplete="off" />
+            <button type="submit" class="bg-green-500 text-white font-bold rounded-full px-8 py-3 hover:bg-green-600 transition-colors ml-4 shadow-md">
+              Search
+            </button>
+          </div>
+          <div id="search-suggestions" class="hidden absolute top-full left-0 right-0 mt-2 bg-gray-800 border border-white/10 rounded-lg shadow-xl overflow-hidden z-50">
+          </div>
+        </form>
+        <div id="trending-topics" class="mt-10 text-left">
+          <h3 class="font-bold text-white text-lg">🔥 Trending Topics</h3>
+          <div class="flex flex-wrap gap-3 mt-4 text-sm"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

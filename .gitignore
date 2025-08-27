@@ -1,0 +1,17 @@
+# Ignore API keys and secrets
+*.env
+*.key
+*.secret
+.env.local
+config.json
+
+# Ignore node_modules if it's a JS project
+node_modules/
+
+# Ignore Python virtual environments if it's Python
+venv/
+__pycache__/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db

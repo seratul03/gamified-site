@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let selectedLanguage = { code: "en", name: "English" };
   let selectedCategory = "all";
   let currentTopic = "";
+  let searchHistory = []; // For storing search history
 
   const contentArea = document.getElementById("content-area");
   const sidebarContainer = document.getElementById("sidebar-container");
@@ -134,6 +135,40 @@ document.addEventListener("DOMContentLoaded", () => {
     "Neural Networks for Beginners",
   ];
 
+  const saveHistory = () => {
+    localStorage.setItem("searchHistory", JSON.stringify(searchHistory));
+  };
+
+  const loadHistory = () => {
+    const storedHistory = localStorage.getItem("searchHistory");
+    if (storedHistory) {
+      searchHistory = JSON.parse(storedHistory);
+    }
+  };
+
+  const renderSearchHistory = () => {
+    if (!sidebarContainer) return;
+    if (searchHistory.length === 0) {
+      sidebarContainer.innerHTML = `
+        <div class="sticky top-28">
+            <h3 class="font-bold text-lg text-white mb-4 border-l-2 border-green-500 pl-3">Search History</h3>
+            <p class="text-gray-400 text-sm pl-3">Your recent searches will appear here.</p>
+        </div>`;
+      return;
+    }
+    const historyHtml = searchHistory
+      .map(
+        (topic) =>
+          `<button class="history-item w-full text-left px-3 py-2 rounded-md text-gray-300 hover:bg-white/10 hover:text-white transition-colors" data-topic="${topic}">${topic}</button>`
+      )
+      .join("");
+    sidebarContainer.innerHTML = `
+        <div class="sticky top-28">
+            <h3 class="font-bold text-lg text-white mb-4 border-l-2 border-green-500 pl-3">Search History</h3>
+            <div class="space-y-2">${historyHtml}</div>
+        </div>`;
+  };
+
   const renderLoader = () =>
     `<div class="flex justify-center py-12"><span class="loader"></span></div>`;
   const renderError = (message) =>
@@ -206,6 +241,7 @@ document.addEventListener("DOMContentLoaded", () => {
     contentArea.innerHTML = ` <h2 class="text-2xl font-bold text-white mb-4">Recommended For You</h2> <p class="text-gray-400 mb-6">Not sure what to learn? Select an interest to get started.</p> <div class="flex flex-wrap items-center gap-2 mb-8">${categoryButtonsHtml}</div> <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">${recommendationCardsHtml}</div> <div class="text-center mt-16"><a href="/recommendations" class="inline-block bg-green-500 text-white font-bold rounded-full px-8 py-4 text-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105"><strong>Explore All Topics &rarr;</strong></a></div>`;
     currentTopic = "";
     updateSearchBarText(null);
+    renderSearchHistory();
   };
 
   const renderLearningSection = (data) => {
@@ -233,7 +269,22 @@ document.addEventListener("DOMContentLoaded", () => {
       const videosHtml = youtubeVideos
         .map(
           (video) =>
-            ` <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer" class="block group"> <div class="relative"><img src="${video.thumbnail}" alt="${video.title}" class="w-full h-auto rounded-lg object-cover aspect-video transition-transform duration-300 group-hover:scale-105" /><div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"> <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg></div></div> <p class="mt-2 text-sm text-gray-300 group-hover:text-green-400 transition-colors duration-200">${video.title}</p> </a>`
+            `<div class="group relative">
+               <a href="https://www.youtube.com/watch?v=${video.id}" target="_blank" rel="noopener noreferrer" class="block">
+                 <div class="relative">
+                   <img src="${video.thumbnail}" alt="${video.title}" class="w-full h-auto rounded-lg object-cover aspect-video transition-transform duration-300 group-hover:scale-105" />
+                   <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                     <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+                   </div>
+                 </div>
+                 <p class="mt-2 text-sm text-gray-300 group-hover:text-green-400 transition-colors duration-200">${video.title}</p>
+               </a>
+               <button class="save-btn absolute top-2 right-2 bg-black/50 text-white px-3 py-1 text-xs rounded-md hover:bg-green-500 transition-colors"
+                       data-type="video"
+                       data-id="${video.id}"
+                       data-title="${video.title}"
+                       data-thumbnail="${video.thumbnail}">Save</button>
+             </div>`
         )
         .join("");
       html += `<div class="bg-white/5 border border-white/10 rounded-xl p-6 mt-8 backdrop-blur-sm card-enter" style="animation-delay: 0.2s"><h2 class="result-card-heading">Top YouTube Videos</h2><div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${videosHtml}</div></div>`;
@@ -242,11 +293,33 @@ document.addEventListener("DOMContentLoaded", () => {
       const articlesHtml = articles
         .map(
           (article) =>
-            ` <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="block p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors group"> <h3 class="text-green-400 font-semibold group-hover:underline">${article.title}</h3> <p class="text-sm text-gray-400 mt-1 line-clamp-2">${article.snippet}</p> <p class="text-xs text-gray-500 mt-2 truncate">${article.link}</p> </a>`
+            `<div class="block p-4 border border-white/10 rounded-lg hover:bg-white/5 transition-colors group relative">
+               <a href="${article.link}" target="_blank" rel="noopener noreferrer">
+                 <h3 class="text-green-400 font-semibold group-hover:underline">${article.title}</h3>
+                 <p class="text-sm text-gray-400 mt-1 line-clamp-2">${article.snippet}</p>
+                 <p class="text-xs text-gray-500 mt-2 truncate">${article.link}</p>
+               </a>
+               <button class="save-btn absolute top-2 right-2 bg-black/50 text-white px-3 py-1 text-xs rounded-md hover:bg-green-500 transition-colors"
+                       data-type="article"
+                       data-title="${article.title}"
+                       data-link="${article.link}"
+                       data-snippet="${article.snippet}">Save</button>
+             </div>`
         )
         .join("");
       html += `<div class="bg-white/5 border border-white/10 rounded-xl p-6 mt-8 backdrop-blur-sm card-enter" style="animation-delay: 0.4s"><h2 class="result-card-heading">Recommended Articles</h2><div class="space-y-4">${articlesHtml}</div></div>`;
     }
+
+    const quizTopic = encodeURIComponent(currentTopic);
+    const quizUrl = `/quiz?topic=${quizTopic}&num_questions=15`;
+    html += `
+        <div class="text-center mt-12 card-enter" style="animation-delay: 0.6s;">
+            <a href="${quizUrl}" target="_blank" rel="noopener noreferrer" class="inline-block bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-full px-10 py-5 text-xl hover:scale-105 transition-transform duration-300 shadow-lg">
+                🧠 Test Your Knowledge
+            </a>
+        </div>
+    `;
+
     contentArea.innerHTML = `<div class="w-full space-y-8">${html}</div>`;
     if (keyConcepts?.length > 0) {
       const conceptsHtml = keyConcepts
@@ -263,9 +336,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const handleSearch = async (topic) => {
     if (!topic || !topic.trim()) return;
+
+    searchHistory = searchHistory.filter(
+      (item) => item.toLowerCase() !== topic.toLowerCase()
+    );
+    searchHistory.unshift(topic);
+    if (searchHistory.length > 7) searchHistory.pop();
+    saveHistory();
+
     currentTopic = topic;
     updateSearchBarText(topic);
     contentArea.innerHTML = renderLoader();
+    sidebarContainer.innerHTML = "";
     history.pushState(
       { type: "search", topic },
       "",
@@ -289,6 +371,44 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       console.error("Search failed:", error);
       contentArea.innerHTML = renderError(error.message);
+    }
+  };
+
+  const handleSave = async (btn) => {
+    const type = btn.dataset.type;
+    const url = `/api/save/${type}`;
+    let payload;
+
+    if (type === "article") {
+      payload = {
+        title: btn.dataset.title,
+        link: btn.dataset.link,
+        snippet: btn.dataset.snippet,
+      };
+    } else {
+      // video
+      payload = {
+        id: btn.dataset.id,
+        title: btn.dataset.title,
+        thumbnail: btn.dataset.thumbnail,
+      };
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error("Save failed");
+      const result = await response.json();
+      console.log(result.message);
+      btn.textContent = "Saved!";
+      btn.disabled = true;
+      btn.classList.add("bg-green-500");
+    } catch (error) {
+      console.error("Error saving item:", error);
+      btn.textContent = "Error";
     }
   };
 
@@ -370,6 +490,19 @@ document.addEventListener("DOMContentLoaded", () => {
       closeSearchOverlay();
     }
 
+    const saveBtn = e.target.closest(".save-btn");
+    if (saveBtn) {
+      handleSave(saveBtn);
+      return;
+    }
+
+    const historyItem = e.target.closest(".history-item");
+    if (historyItem) {
+      const topic = historyItem.dataset.topic;
+      if (topic) handleSearch(topic);
+      return;
+    }
+
     const suggestionItem = e.target.closest("[data-suggestion]");
     if (suggestionItem) {
       const topic = suggestionItem.dataset.suggestion;
@@ -436,6 +569,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  loadHistory();
   renderLanguageMenu();
   handleInitialPageLoad();
   if (trendingTopicsContainer) {

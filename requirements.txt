@@ -1,0 +1,4 @@
+Flask
+google-generativeai
+google-api-python-client
+python-dotenv

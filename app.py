@@ -2,8 +2,9 @@ import os
 import json
 import re
 import uuid
-import google.generativeai as genai
+from google import genai
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from flask import Flask, request, jsonify, render_template, url_for
 from dotenv import load_dotenv
 
@@ -17,7 +18,8 @@ YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY")
 GOOGLE_SEARCH_ENGINE_ID = os.getenv("GOOGLE_SEARCH_ENGINE_ID")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+SEARCH_MODEL = os.getenv("SEARCH_MODEL", "gemini-2.5-flash")
 
 # --- In-memory Stores ---
 saved_articles = []
@@ -27,19 +29,24 @@ app.QUIZ_STORE = {}
 # --- API Client Setup ---
 youtube = build("youtube", "v3", developerKey=YOUTUBE_API_KEY)
 customsearch = build("customsearch", "v1", developerKey=GOOGLE_SEARCH_API_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
-search_model = genai.GenerativeModel('gemini-1.5-flash')
-quiz_model = genai.GenerativeModel(GEMINI_MODEL)
-
-
-# ======================================================
-# ========= ROUTES FOR GAMIFIED LEARNING SITE ==========
-# ======================================================
-
+gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 language_name_map = {
     "en": "English", "es": "Spanish", "hi": "Hindi",
     "fr": "French", "de": "German",
 }
+
+
+def generate_gemini_text(prompt, model_name):
+    response = gemini_client.models.generate_content(
+        model=model_name,
+        contents=prompt,
+    )
+    if hasattr(response, "text") and response.text:
+        return response.text
+    try:
+        return response.candidates[0].content.parts[0].text
+    except Exception:
+        return str(response)
 
 @app.route("/")
 def index():
@@ -63,7 +70,7 @@ def profile():
 def search():
     try:
         if request.method == "POST":
-            data = request.get_json()
+            data = request.get_json(silent=True) or {}
             topic = data.get('topic')
             lang_code = data.get('language', 'en')
         else:
@@ -75,40 +82,65 @@ def search():
 
         full_language_name = language_name_map.get(lang_code, "English")
 
-        short_prompt = (f'Provide a concise, 2-3 sentence summary for the topic: "{topic}". The explanation MUST be in {full_language_name}.')
-        short_explanation_res = search_model.generate_content(short_prompt)
-        short_explanation = short_explanation_res.text
-
-        long_prompt = (f'Provide a long, polished explanation for the topic: "{topic}". Act as a professional. The explanation MUST be in {full_language_name}. Format it into multiple paragraphs separated by a blank line.')
-        long_explanation_res = search_model.generate_content(long_prompt)
-        long_explanation = long_explanation_res.text
-        
-        key_concepts_prompt = (
-            f'From the following text, extract the 5 most important keywords or concepts. For each concept, provide a one-sentence definition. '
-            f'Return the result as a valid JSON object with a single key "concepts" which is an array of objects, where each object has "term" and "definition" keys. '
-            f'The entire response must be only the JSON object, with no other text or formatting. Text: "{long_explanation}"'
-        )
-        key_concepts_res = search_model.generate_content(key_concepts_prompt)
-        
+        short_explanation = f"No summary available right now for '{topic}'."
+        long_explanation = f"We could not fetch the full explanation right now for '{topic}'. Please try again in a moment."
         key_concepts = []
+        articles = []
+        youtube_videos = []
+        warnings = []
+
         try:
-            json_text_match = re.search(r'```json\s*([\s\S]*?)\s*```', key_concepts_res.text)
+            short_prompt = (f'Provide a concise, 2-3 sentence summary for the topic: "{topic}". The explanation MUST be in {full_language_name}.')
+            short_explanation = generate_gemini_text(short_prompt, SEARCH_MODEL)
+
+            long_prompt = (f'Provide a long, polished explanation for the topic: "{topic}". Act as a professional. The explanation MUST be in {full_language_name}. Format it into multiple paragraphs separated by a blank line.')
+            long_explanation = generate_gemini_text(long_prompt, SEARCH_MODEL)
+        except Exception as e:
+            warnings.append(f"AI generation failed: {str(e)}")
+
+        try:
+            key_concepts_prompt = (
+                f'From the following text, extract the 5 most important keywords or concepts. For each concept, provide a one-sentence definition. '
+                f'Return the result as a valid JSON object with a single key "concepts" which is an array of objects, where each object has "term" and "definition" keys. '
+                f'The entire response must be only the JSON object, with no other text or formatting. Text: "{long_explanation}"'
+            )
+            key_concepts_text = generate_gemini_text(key_concepts_prompt, SEARCH_MODEL)
+
+            json_text_match = re.search(r'```json\s*([\s\S]*?)\s*```', key_concepts_text)
             if json_text_match:
                 cleaned_json = json.loads(json_text_match.group(1))
                 if 'concepts' in cleaned_json:
                     key_concepts = cleaned_json['concepts']
+            else:
+                cleaned_json = json.loads(key_concepts_text)
+                if 'concepts' in cleaned_json:
+                    key_concepts = cleaned_json['concepts']
         except (json.JSONDecodeError, AttributeError) as e:
-            print(f"Error parsing key concepts JSON: {e}")
+            warnings.append(f"Concept parsing failed: {str(e)}")
+        except Exception as e:
+            warnings.append(f"Concept extraction failed: {str(e)}")
 
-        search_res = customsearch.cse().list(cx=GOOGLE_SEARCH_ENGINE_ID, q=topic, num=10, lr=f"lang_{lang_code}").execute()
-        articles = [{"title": item.get("title"), "link": item.get("link"), "snippet": item.get("snippet")} for item in search_res.get("items", [])]
+        try:
+            search_res = customsearch.cse().list(cx=GOOGLE_SEARCH_ENGINE_ID, q=topic, num=10, lr=f"lang_{lang_code}").execute()
+            articles = [{"title": item.get("title"), "link": item.get("link"), "snippet": item.get("snippet")} for item in search_res.get("items", [])]
+        except HttpError as e:
+            warnings.append(f"Google Search API failed ({e.status_code}): {str(e)}")
+        except Exception as e:
+            warnings.append(f"Google Search API failed: {str(e)}")
 
-        youtube_res = youtube.search().list(part="snippet", q=topic, type="video", maxResults=10, relevanceLanguage=lang_code).execute()
-        youtube_videos = [{"id": item["id"]["videoId"], "title": item["snippet"]["title"], "thumbnail": item["snippet"]["thumbnails"]["high"]["url"]} for item in youtube_res.get("items", [])]
+        try:
+            youtube_res = youtube.search().list(part="snippet", q=topic, type="video", maxResults=10, relevanceLanguage=lang_code).execute()
+            youtube_videos = [{"id": item["id"]["videoId"], "title": item["snippet"]["title"], "thumbnail": item["snippet"]["thumbnails"]["high"]["url"]} for item in youtube_res.get("items", [])]
+        except HttpError as e:
+            warnings.append(f"YouTube API failed ({e.status_code}): {str(e)}")
+        except Exception as e:
+            warnings.append(f"YouTube API failed: {str(e)}")
 
         return jsonify({
-            "message": "Success", "aiExplanationShort": short_explanation, "aiExplanationLong": long_explanation,
+            "message": "Success" if not warnings else "Partial success",
+            "aiExplanationShort": short_explanation, "aiExplanationLong": long_explanation,
             "keyConcepts": key_concepts, "youtubeVideos": youtube_videos, "articles": articles,
+            "warnings": warnings,
         })
     except Exception as e:
         print(f"API Route Error: {e}")
@@ -139,13 +171,9 @@ def show_video(video_id):
     return render_template("video.html", video=video)
 
 
-# ======================================================
-# ================= ROUTES FOR QUIZ SITE ===============
-# ======================================================
-
 @app.route('/quiz')
 def quiz_page():
-    return render_template('quiz.html')
+    return render_template('Quiz.html')
 
 @app.route('/generate_quiz', methods=['POST'])
 def generate_quiz():
@@ -157,7 +185,7 @@ def generate_quiz():
         return jsonify({'error': 'Topic is required.'}), 400
 
     prompt = f"""
-    Generate {num_questions} multiple-choice questions about the topic: "{topic}".
+    Generate {num_questions} multiple-choice advance level hardest questions about the topic: "{topic}".
     Return output strictly as JSON in this format:
     {{
       "quiz": [
@@ -171,9 +199,9 @@ def generate_quiz():
     }}
     """
     try:
-        response = quiz_model.generate_content(prompt)
-        json_text_match = re.search(r'```json\s*([\s\S]*?)\s*```', response.text)
-        json_text = json_text_match.group(1) if json_text_match else response.text
+        response_text = generate_gemini_text(prompt, GEMINI_MODEL)
+        json_text_match = re.search(r'```json\s*([\s\S]*?)\s*```', response_text)
+        json_text = json_text_match.group(1) if json_text_match else response_text
         quiz_obj = json.loads(json_text)
 
         client_quiz = []
